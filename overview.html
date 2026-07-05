@@ -3,196 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📝 支出項目表單 - 學校支出管理系統</title>
+    <title>📊 開支總概覽與審批 - 學校支出管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
-    <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .field-row-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
-    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
     <header class="bg-white border-b border-slate-200 py-4 px-6 sticky top-0 z-10 shadow-sm">
-        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <a href="overview.html" class="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg transition-colors"><i class="fa-solid fa-arrow-left text-lg"></i></a>
-                <div>
-                    <h1 class="text-xl font-bold tracking-tight text-slate-900" id="pageTitle">📝 新增支出項目</h1>
-                    <p class="text-xs text-slate-500">系統自動載入雲端 PDF 範本與字型</p>
-                </div>
+                <a href="main.html" class="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><i class="fa-solid fa-arrow-left text-lg"></i></a>
+                <div><h1 class="text-xl font-bold">📊 開支總概覽與審批列表</h1></div>
             </div>
-            <div class="flex flex-col items-end gap-1">
-                <span id="systemStatus" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border flex items-center gap-1.5"><i class="fa-solid fa-spinner fa-spin"></i> 正在連線伺服器...</span>
-            </div>
+            <div class="text-right text-xs"><span class="font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-full" id="userBadge">--</span></div>
         </div>
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <section class="lg:col-span-5 flex flex-col gap-6 overflow-y-auto custom-scrollbar max-h-[85vh] pr-2">
-            
-            <div class="bg-slate-100/80 rounded-xl p-4 border border-slate-200 shadow-inner">
-                <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2"><i class="fa-solid fa-id-card mr-1.5 text-blue-500"></i>1. 當前登入者資訊</h2>
-                <div class="grid grid-cols-2 gap-3 text-xs">
-                    <div><span class="text-slate-400">登入使用者：</span><strong id="infoName" class="text-slate-700">--</strong></div>
-                    <div><span class="text-slate-400">職位：</span><strong id="infoRole" class="text-slate-700">--</strong></div>
-                    <div><span class="text-slate-400">科/組：</span><strong id="infoGroup" class="text-slate-700">--</strong></div>
-                    <div><span class="text-slate-400">上級主管：</span><strong id="infoManager" class="text-slate-700">--</strong></div>
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-blue-500"></i>
+                    <div><strong>權限：</strong> <span id="permissionInfoText"></span></div>
                 </div>
-            </div>
-
-            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
-                <h2 class="text-sm font-semibold text-slate-700 border-b border-slate-100 pb-2"><i class="fa-solid fa-edit text-blue-500"></i> 2. 支出明細 (必填)</h2>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label class="block text-xs font-bold text-slate-600 mb-1">款項類別 <span class="text-rose-500">*</span></label>
-                        <select id="formCategory" class="w-full bg-slate-50 border border-slate-300 text-xs rounded-lg px-3 py-2"><option value="">-- 請選擇 --</option><option value="教材">教材</option><option value="印刷">印刷</option><option value="活動">活動</option><option value="其他">其他</option></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">金額 <span class="text-rose-500">*</span></label>
-                        <div class="flex">
-                            <span class="inline-flex items-center px-2 rounded-l-md border border-r-0 border-slate-300 bg-slate-100 text-slate-500 text-xs">HKD</span>
-                            <input type="number" id="formAmount" placeholder="如: 50" class="w-full bg-slate-50 border border-slate-300 text-xs rounded-r-md px-3 py-2">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">收款人 <span class="text-rose-500">*</span></label>
-                        <input type="text" id="formPayee" class="w-full bg-slate-50 border border-slate-300 text-xs rounded-lg px-3 py-2">
-                    </div>
-                    <div class="col-span-2">
-                        <label class="block text-xs font-bold text-slate-600 mb-1">物品 / 服務項目 <span class="text-rose-500">*</span></label>
-                        <input type="text" id="formItem" class="w-full bg-slate-50 border border-slate-300 text-xs rounded-lg px-3 py-2">
-                    </div>
-                    <div class="col-span-2">
-                        <label class="block text-xs font-bold text-slate-600 mb-1">用途說明 <span class="text-rose-500">*</span></label>
-                        <textarea id="formPurpose" rows="2" class="w-full bg-slate-50 border border-slate-300 text-xs rounded-lg px-3 py-2"></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
-                <h2 class="text-sm font-semibold text-slate-700 uppercase"><i class="fa-solid fa-folder-open mr-2 text-amber-500"></i>3. PDF 範本與字型載入</h2>
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <label class="block text-xs font-bold text-amber-900 mb-1">📁 部署本機總資料夾 (優先建議)</label>
-                    <button id="deployBtn" class="w-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2 rounded shadow flex items-center justify-center gap-1.5"><i class="fa-solid fa-folder-tree"></i> 連接本地支出範本資料夾</button>
-                    <div id="deployStatus" class="mt-1.5 text-[10px] text-slate-500 text-center">❌ 尚未連接</div>
-                </div>
-                <div id="fallbackUploadContainer" class="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                    <label class="block text-xs font-bold text-slate-500 mb-1">📥 傳統手動上載 PDF (備用)</label>
-                    <input type="file" id="pdfUpload" accept=".pdf" class="text-xs w-full text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 cursor-pointer">
-                </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3.5 space-y-2">
-                    <label class="block text-xs font-bold text-blue-900">🔤 中文字型配置</label>
-                    <button id="autoDownloadFontBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded flex justify-center gap-1.5"><i class="fa-solid fa-cloud-arrow-down"></i> <span id="downloadBtnText">嘗試從網絡自動下載字型</span></button>
-                    <div class="mt-2 pt-2 border-t border-blue-200">
-                        <label class="block text-[10px] font-bold text-slate-600 mb-1">或手動選擇本地字型檔 (.ttf)：</label>
-                        <input type="file" id="fontUpload" accept=".ttf,.ttc" class="text-xs w-full text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-100 file:text-blue-700 cursor-pointer">
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
-                <h2 class="text-sm font-semibold text-slate-700 mb-2"><i class="fa-solid fa-square-check mr-2 text-indigo-500"></i>4. 快速打勾項目 (✔)</h2>
-                <div id="presetsContainer" class="grid grid-cols-2 gap-2"></div>
-            </div>
-
-            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col min-h-[250px]">
-                <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-                    <h2 class="text-sm font-semibold text-slate-700"><i class="fa-solid fa-list-check mr-2 text-emerald-500"></i>5. 填寫欄位清單</h2>
-                    <button id="addFieldBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1 px-2.5 rounded"><i class="fa-solid fa-plus"></i> 新增自訂欄位</button>
-                </div>
-                <div id="fieldsContainer" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 max-h-[30vh] pr-1"></div>
-            </div>
-
-            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
-                <button id="applyBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3 rounded-lg flex justify-center gap-2"><i class="fa-solid fa-pen-nib"></i> 僅更新並重繪預覽畫布</button>
-                <button id="submitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3.5 rounded-lg flex justify-center gap-2 mt-2 shadow-lg"><i class="fa-solid fa-cloud-arrow-up"></i> ✅ 提交並儲存至學校系統</button>
                 
-                <div id="postSubmitActions" class="hidden grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100">
-                    <button id="previewModifiedBtn" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5"><i class="fa-solid fa-eye"></i> 顯示下方實體預覽</button>
-                    <button id="exportPdfBtn" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5"><i class="fa-solid fa-file-arrow-down"></i> 下載本機 PDF</button>
+                <div id="tabContainer" class="hidden bg-slate-200 p-1 rounded-lg">
+                    <button id="tabActive" onclick="switchTab('ACTIVE')" class="px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all">📂 活躍記錄 (未封存)</button>
+                    <button id="tabAll" onclick="switchTab('ALL')" class="px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all">🗄️ 全部記錄 (含封存)</button>
                 </div>
             </div>
-        </section>
+            
+            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-file-excel"></i> 匯出全新格式 Excel
+            </button>
+        </div>
 
-        <!-- 右側畫布 -->
-        <section class="lg:col-span-7">
-            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col h-full">
-                <h2 class="text-sm font-semibold text-slate-700 mb-2"><i class="fa-solid fa-crosshairs mr-2 text-rose-500"></i>視覺定位畫布</h2>
-                <div class="canvas-wrapper border-2 border-slate-200 rounded-lg overflow-auto bg-slate-100 flex justify-center max-h-[75vh]" id="canvasScrollContainer">
-                    <canvas id="previewCanvas" class="max-w-full h-auto cursor-crosshair shadow-md bg-white"></canvas>
-                </div>
-            </div>
+        <div id="summaryCardsContainer" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
 
-            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hidden mt-6" id="previewIframeContainer">
-                <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-sm font-semibold text-slate-700"><i class="fa-solid fa-file-pdf text-red-500 mr-2"></i>實體 PDF 導出預覽</h2>
-                    <button onclick="document.getElementById('previewIframeContainer').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-                </div>
-                <iframe id="modifiedPdfPreview" class="w-full h-[500px] border border-slate-200 rounded-lg shadow-inner"></iframe>
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="p-3 bg-slate-50 border-b flex justify-between items-center text-sm font-bold text-slate-700">
+                <span id="tableTitle">📋 顯示範圍：全部記錄</span>
+                <span class="text-indigo-600" id="tableTotalAmount">小計: $0 HKD</span>
             </div>
-        </section>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-100/70 border-b text-slate-600 font-bold">
+                            <th class="p-3 w-10 text-center">#</th>
+                            <th class="p-3">日期/類別</th><th class="p-3 w-1/4">用途與摘要</th><th class="p-3">金額(HKD)</th>
+                            <th class="p-3">申請人</th><th class="p-3">狀態</th><th class="p-3 w-[15%]">備註</th><th class="p-3 w-[20%]">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+            <div id="emptyPlaceholder" class="hidden p-12 text-center text-slate-400 space-y-2">
+                <div class="text-4xl"><i class="fa-solid fa-folder-open"></i></div>
+                <p class="text-sm">查無符合條件的開支記錄。</p>
+            </div>
+        </div>
     </main>
 
     <script>
+        // 🌟 修正點 1: 防止未登入導致同步崩潰
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-        if (!currentUser) window.location.href = 'index.html';
-
-        const managerMap = { 'user1': '趙統籌', 'user2': '張永成', 'user3': '趙統籌', 'user4': '無', 'accountant': '無', 'sysadmin': '無' };
-        currentUser.manager = managerMap[currentUser.id] || '無';
-
-        let pdfDoc=null, pdfJsDoc=null, originalPdfBytes=null, modifiedPdfBytes=null;
-        let fields = [], nextId = 100, activeFieldId = null, offscreenCache = null, pageRendered = false;
-        let customFontBytes = null, pageHeight = 0;
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        let editId = urlParams.get('editId');
-        let dupId = urlParams.get('dupId');
-        let isEditMode = !!editId;
-        let isDupMode = !!dupId;
-
-        if (isEditMode) document.getElementById('pageTitle').textContent = "✏️ 重新編輯並提交";
-        if (isDupMode) document.getElementById('pageTitle').textContent = "📑 複製新增項目";
-
-        let checkboxPresets = [
-            { id: 'dept_mongkok', label: '小學部(旺角)', x: 153, y: 779, checked: false, fontSize: 13, group: '部門' },
-            { id: 'dept_tko', label: '小學部(將軍澳)', x: 250, y: 778, checked: false, fontSize: 13, group: '部門' },
-            { id: 'dept_secondary', label: '中學部', x: 347, y: 779, checked: false, fontSize: 13, group: '部門' },
-            { id: 'cheque_supplier', label: '轉交給供應商', x: 48, y: 652, checked: false, fontSize: 13, group: '支票' },
-            { id: 'cheque_applicant', label: '退還給申請人', x: 48, y: 633, checked: false, fontSize: 13, group: '支票' },
-            { id: 'type_school', label: '學校支出', x: 48, y: 537, checked: false, fontSize: 13, group: '類別' },
-            { id: 'type_subsidy', label: '津貼/贊助金', x: 49, y: 520, checked: false, fontSize: 13, group: '類別' },
-            { id: 'type_other', label: '其他', x: 49, y: 502, checked: false, fontSize: 13, group: '類別' },
-            { id: 'decl_no_interest', label: '沒有利益衝突', x: 44, y: 177, checked: false, fontSize: 13, group: '聲明' },
-            { id: 'decl_has_interest', label: '有利益衝突', x: 42, y: 155, checked: false, fontSize: 13, group: '聲明' }
-        ];
-
-        const canvas = document.getElementById('previewCanvas'), ctx = canvas.getContext('2d');
-        const todayStr = new Date().toISOString().split('T')[0];
-        
-        document.getElementById('infoName').textContent = currentUser.name;
-        document.getElementById('infoRole').textContent = currentUser.role;
-        document.getElementById('infoGroup').textContent = currentUser.group;
-        document.getElementById('infoManager').textContent = currentUser.manager;
-
-        function setStatus(msg, type = 'info') {
-            const statusSpan = document.getElementById('systemStatus');
-            statusSpan.className = "px-3 py-1.5 rounded-full text-xs font-semibold border flex items-center gap-1.5 ";
-            if (type === 'error') { statusSpan.classList.add('bg-rose-100', 'text-rose-800', 'border-rose-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${msg}`; }
-            else if (type === 'success') { statusSpan.classList.add('bg-emerald-100', 'text-emerald-800', 'border-emerald-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg}`; }
-            else if (type === 'loading') { statusSpan.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> ${msg}`; }
-            else { statusSpan.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-200'); statusSpan.innerHTML = `<i class="fa-solid fa-info-circle"></i> ${msg}`; }
+        if (!currentUser) {
+            window.location.href = 'index.html';
+            throw new Error('未登入，中止執行並跳轉至登入頁面'); 
         }
 
-        // 🌟 升級資料庫至 Version 3，強制 GitHub 建立表格
+        document.getElementById('userBadge').textContent = `${currentUser.name} (${currentUser.role})`;
+
+        const permissionDesc = {
+            'user4': 'T&L 統籌：查閱全校明細，撰寫備註，不具批核權。',
+            'accountant': '會計員：最高權限，可批核狀態及備註任何項目。',
+            'sysadmin': '系統管理員：最高權限，管理系統數據。',
+            'user1': 'Panel：查閱所屬科組明細並撰寫備註。'
+        };
+        document.getElementById('permissionInfoText').textContent = permissionDesc[currentUser.id] || '一般瀏覽及備註回覆。';
+
+        let allFetchedRecords = [];
+        let viewableRecords = [];
+        let currentFilterGroup = 'ALL'; 
+        let currentTab = 'ACTIVE';
+
+        // 🌟 修正點 2: 升級至 Version 4
         function initDB() {
             return new Promise((resolve, reject) => {
-                const req = indexedDB.open('SchoolExpenseDB', 3);
+                const req = indexedDB.open('SchoolExpenseDB', 4);
                 req.onupgradeneeded = e => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains('expenses')) db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
@@ -203,334 +104,291 @@
             });
         }
 
-        async function loadServerAssets() {
+        function parseAmt(str) { return parseFloat(String(str).replace(/[^\d.-]/g, '')) || 0; }
+
+        async function loadData() {
             try {
-                const fontRes = await fetch('font.ttf');
-                if (fontRes.ok) customFontBytes = new Uint8Array(await fontRes.arrayBuffer());
-
-                const pdfRes = await fetch('template.pdf');
-                if (!pdfRes.ok) throw new Error('伺服器找不到 template.pdf');
-                originalPdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
-                
-                pdfJsDoc = await pdfjsLib.getDocument({data: originalPdfBytes}).promise;
-                await renderCanvasLayout();
-                setStatus('系統準備就緒 (已載入雲端範本)', 'success');
-            } catch(e) {
-                setStatus('請使用「手動上載 PDF」', 'info');
-            }
-        }
-
-        function loadDefaultFields() {
-            fields = [
-                { id: 'sys_name', label: '申請者', x: 442, y: 707, fontSize: 12, content: currentUser.name, isSystem: true },
-                { id: 'sys_role', label: '職位', x: 409, y: 676, fontSize: 12, content: currentUser.role, isSystem: true },
-                { id: 'sys_date', label: '日期', x: 115, y: 470, fontSize: 12, content: todayStr, isSystem: true },
-                { id: 'sys_group', label: '科/組', x: 452, y: 604, fontSize: 12, content: currentUser.group, isSystem: true },
-                { id: 'sys_manager', label: '上級', x: 453, y: 572, fontSize: 12, content: currentUser.manager, isSystem: true },
-                { id: 'sys_amount', label: '金額', x: 258, y: 471, fontSize: 12, content: '', isSystem: true },
-                { id: 'sys_item', label: '項目', x: 114, y: 441, fontSize: 12, content: '', isSystem: true },
-                { id: 'sys_purpose', label: '用途', x: 113, y: 412, fontSize: 12, content: '', isSystem: true },
-                { id: 'sys_payee', label: '收款人', x: 116, y: 384, fontSize: 12, content: '', isSystem: true }
-            ];
-            fastRefreshUI();
-        }
-
-        async function initData() {
-            await loadServerAssets();
-
-            let db;
-            try {
-                db = await initDB();
-            } catch(e) {
-                console.error(e);
-                alert("資料庫初始化失敗！");
-                return;
-            }
-
-            const targetId = editId || dupId;
-            if (targetId) {
+                const db = await initDB();
                 try {
-                    // 加入防崩潰保護 (try...catch)
-                    const tx = db.transaction(['expenses'], 'readonly');
-                    tx.objectStore('expenses').get(parseInt(targetId)).onsuccess = e => {
-                        const record = e.target.result;
-                        if(record) {
-                            document.getElementById('formCategory').value = record.category;
-                            document.getElementById('formAmount').value = record.amount.replace(/[^\d.-]/g, '');
-                            document.getElementById('formItem').value = record.item;
-                            document.getElementById('formPurpose').value = record.purpose;
-                            document.getElementById('formPayee').value = record.payee;
-                            
-                            fields = JSON.parse(record.fieldsSnapshot);
-                            
-                            if (isDupMode) {
-                                const dateField = fields.find(f => f.id === 'sys_date');
-                                if (dateField) dateField.content = todayStr;
-                                fields.find(f => f.id === 'sys_name').content = currentUser.name;
-                                fields.find(f => f.id === 'sys_role').content = currentUser.role;
-                                fields.find(f => f.id === 'sys_group').content = currentUser.group;
-                                fields.find(f => f.id === 'sys_manager').content = currentUser.manager;
-                            }
+                    const tx = db.transaction('expenses', 'readonly');
+                    allFetchedRecords = await new Promise(r => { tx.objectStore('expenses').getAll().onsuccess = e => r(e.target.result); });
+                    allFetchedRecords.sort((a, b) => b.id - a.id);
+                } catch(e) {
+                    console.warn('資料表為空或未就緒', e);
+                    allFetchedRecords = [];
+                }
 
-                            checkboxPresets.forEach(p => { p.checked = fields.some(f => f.id === 'preset_' + p.id); });
-                            fastRefreshUI();
+                if (['accountant', 'user4', 'sysadmin'].includes(currentUser.id)) currentFilterGroup = 'ALL_SCHOOL';
+                else if (currentUser.id === 'user1') currentFilterGroup = 'TE科';
+                else currentFilterGroup = 'PERSONAL';
+
+                renderSummaryCards();
+                processPermissionsAndTabs();
+            } catch (err) {
+                console.error("載入失敗:", err);
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabActive').className = tab === 'ACTIVE' ? "px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all" : "px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all";
+            document.getElementById('tabAll').className = tab === 'ALL' ? "px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all" : "px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all";
+            processPermissionsAndTabs();
+        }
+
+        function processPermissionsAndTabs() {
+            const isPersonalView = currentFilterGroup === 'PERSONAL';
+            if (isPersonalView) {
+                document.getElementById('tabContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('tabContainer').classList.add('hidden');
+                currentTab = 'ACTIVE';
+            }
+
+            viewableRecords = allFetchedRecords.filter(r => {
+                if (isPersonalView) {
+                    if (r.userId !== currentUser.id) return false;
+                    if (currentTab === 'ACTIVE' && r.archived) return false;
+                    return true;
+                } else if (currentFilterGroup === 'ALL_SCHOOL') {
+                    if (r.archived) return false;
+                    return true;
+                } else {
+                    if (r.archived) return false;
+                    if (r.group !== currentFilterGroup) return false;
+                    return true;
+                }
+            });
+            renderTable(currentFilterGroup);
+        }
+
+        function renderSummaryCards() {
+            const cont = document.getElementById('summaryCardsContainer'); cont.innerHTML = '';
+            let sums = { PERSONAL: 0, ALL_SCHOOL: 0 };
+            let groupSums = {};
+
+            allFetchedRecords.forEach(r => {
+                const v = parseAmt(r.amount);
+                if (r.userId === currentUser.id && !r.archived) sums.PERSONAL += v;
+                if (!r.archived) {
+                    sums.ALL_SCHOOL += v;
+                    if (!groupSums[r.group]) groupSums[r.group] = 0;
+                    groupSums[r.group] += v;
+                }
+            });
+
+            const createCard = (title, key, amt, col) => {
+                const c = document.createElement('div');
+                c.className = `p-4 rounded-xl border cursor-pointer ${currentFilterGroup===key?'border-blue-500 bg-blue-50 ring-2 ring-blue-200':'border-slate-200 bg-white hover:shadow-md'}`;
+                c.onclick = () => { currentFilterGroup = key; renderSummaryCards(); processPermissionsAndTabs(); };
+                c.innerHTML = `<div class="flex gap-2 items-center mb-2"><div class="w-6 h-6 rounded-full ${col} flex items-center text-white"><i class="fa-solid fa-chart-pie mx-auto text-xs"></i></div><span class="font-bold text-xs">${title}</span></div><div class="text-xl font-black">$${amt.toLocaleString()}</div>`;
+                cont.appendChild(c);
+            };
+
+            if (['accountant','user4','sysadmin'].includes(currentUser.id)) {
+                createCard('全校總計 (未封存)', 'ALL_SCHOOL', sums.ALL_SCHOOL, 'bg-blue-500');
+                for (let g in groupSums) createCard(`${g} (未封存)`, g, groupSums[g], 'bg-indigo-500');
+                if (sums.PERSONAL > 0) createCard('個人開支', 'PERSONAL', sums.PERSONAL, 'bg-emerald-500');
+            } else if (currentUser.id === 'user1') {
+                createCard('TE科 科組明細', 'TE科', groupSums['TE科'] || 0, 'bg-indigo-500');
+                createCard('個人開支', 'PERSONAL', sums.PERSONAL, 'bg-emerald-500');
+            } else {
+                createCard('個人開支', 'PERSONAL', sums.PERSONAL, 'bg-emerald-500');
+            }
+        }
+
+        function renderTable(filter) {
+            const tbody = document.getElementById('expenseTableBody'); tbody.innerHTML = '';
+            let displayTitle = filter === 'ALL_SCHOOL' ? '全校所有記錄' : (filter === 'PERSONAL' ? '個人開支' : filter);
+            if (filter === 'PERSONAL') displayTitle += (currentTab === 'ACTIVE' ? ' (未封存)' : ' (含封存)');
+            
+            document.getElementById('tableTitle').textContent = `📋 範圍：${displayTitle}`;
+            document.getElementById('tableTotalAmount').textContent = `小計: $${viewableRecords.reduce((s,r)=>s+parseAmt(r.amount),0).toLocaleString()} HKD`;
+
+            if(viewableRecords.length === 0) { document.getElementById('emptyPlaceholder').classList.remove('hidden'); return; }
+            document.getElementById('emptyPlaceholder').classList.add('hidden');
+
+            viewableRecords.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                let statusColor = item.archived ? 'bg-slate-200 text-slate-500' : (item.status==='已核准'?'bg-emerald-100 text-emerald-800':(item.status==='已拒絕'?'bg-rose-100 text-rose-800':'bg-amber-100 text-amber-800'));
+                
+                let statHTML = `<span class="px-2 py-1 rounded text-[10px] font-bold ${statusColor}">${item.archived ? '已封存' : item.status}</span>`;
+                if (currentUser.id === 'accountant' && !item.archived) {
+                    statHTML = `<select onchange="updateStat(${item.id}, this.value)" class="text-[10px] font-bold px-1 py-1 rounded border border-slate-300 bg-white text-blue-600"><option value="待審核" ${item.status==='待審核'?'selected':''}>待審核</option><option value="已核准" ${item.status==='已核准'?'selected':''}>已核准</option><option value="已拒絕" ${item.status==='已拒絕'?'selected':''}>已拒絕</option></select>`;
+                }
+
+                let actionHTML = `<div class="flex flex-col gap-1">`;
+                actionHTML += `<div class="flex gap-1">`;
+                
+                actionHTML += `<button onclick="handlePdfAction(${item.id}, 'view')" class="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded flex-1"><i class="fa-solid fa-up-right-from-square"></i> 開啟預覽</button>`;
+                
+                if (!item.archived && (item.userId === currentUser.id || currentUser.id === 'accountant')) {
+                    actionHTML += `<a href="expense_form.html?editId=${item.id}" class="text-[10px] bg-rose-600 text-white hover:bg-rose-700 px-2 py-1 rounded">✍️ 編輯</a>`;
+                }
+                actionHTML += `</div><div class="flex gap-1">`;
+                actionHTML += `<a href="expense_form.html?dupId=${item.id}" class="text-[10px] bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1 rounded flex-1 text-center" title="以此為範本建立新申請">📑 複製</a>`;
+                
+                if (!item.archived && item.userId === currentUser.id) {
+                    actionHTML += `<button onclick="archiveRecord(${item.id})" class="text-[10px] bg-slate-200 text-slate-600 hover:bg-slate-300 px-2 py-1 rounded">📦 封存</button>`;
+                }
+                actionHTML += `</div></div>`;
+
+                tr.innerHTML = `
+                    <td class="p-3 text-center font-bold text-slate-400">${index + 1}</td>
+                    <td class="p-3 font-bold text-slate-700">${item.date}<br><span class="bg-slate-100 px-1 rounded font-normal text-[10px]">${item.category}</span></td>
+                    <td class="p-3 font-bold text-slate-800">${item.item}<br><span class="font-normal text-[10px] text-slate-400 line-clamp-1" title="${item.purpose}">${item.purpose}</span></td>
+                    <td class="p-3 font-black text-blue-700">$${parseAmt(item.amount).toLocaleString()}</td>
+                    <td class="p-3 text-slate-700">${item.userName}<br><span class="text-[10px] text-slate-400">${item.group}</span></td>
+                    <td class="p-3">${statHTML}</td>
+                    <td class="p-3">
+                        <div class="bg-amber-50 p-1.5 text-[10px] rounded border border-amber-100 mb-1 max-h-12 overflow-hidden text-slate-600">${item.remarks||'無'}</div>
+                        <button onclick="editRemark(${item.id})" class="text-[10px] text-blue-600 hover:underline">加備註</button>
+                    </td>
+                    <td class="p-3">
+                        <div class="text-[9px] text-slate-400 bg-slate-100 p-1 rounded font-mono truncate max-w-[120px] mb-1" title="${item.filePath}">${item.filePath}</div>
+                        ${actionHTML}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function archiveRecord(id) {
+            if(!confirm('📦 確定要封存此記錄嗎？\n封存後不可復原，上級與會計員將無法再看到此項目！')) return;
+            const db = await initDB(); const tx = db.transaction('expenses','readwrite');
+            const store = tx.objectStore('expenses');
+            store.get(id).onsuccess = e => { let r=e.target.result; r.archived = true; store.put(r).onsuccess=()=>loadData(); };
+        }
+
+        async function updateStat(id, stat) {
+            const db = await initDB(); const tx = db.transaction('expenses','readwrite');
+            const store = tx.objectStore('expenses');
+            store.get(id).onsuccess = e => { let r=e.target.result; r.status=stat; store.put(r).onsuccess=()=>loadData(); };
+        }
+        
+        async function editRemark(id) {
+            const db = await initDB(); const tx = db.transaction('expenses','readwrite');
+            const store = tx.objectStore('expenses');
+            store.get(id).onsuccess = e => {
+                let r=e.target.result; const n = prompt('輸入備註/回覆:', r.remarks);
+                if(n!==null && n.trim()!=='') { r.remarks=`${n}\n(${currentUser.name}) - ${new Date().toLocaleDateString()}`; store.put(r).onsuccess=()=>loadData(); }
+            };
+        }
+
+        async function handlePdfAction(id, action) {
+            try {
+                const db = await initDB();
+                const tx = db.transaction(['expenses', 'settings'], 'readonly');
+                const record = await new Promise(r => { tx.objectStore('expenses').get(parseInt(id)).onsuccess = (e) => r(e.target.result); });
+
+                let originalBytes = null;
+                try {
+                    const res = await fetch('template.pdf');
+                    if (res.ok) originalBytes = new Uint8Array(await res.arrayBuffer());
+                } catch(e) {}
+
+                if (!originalBytes) {
+                    alert('伺服器找不到 template.pdf，請手動提供範本。');
+                    const input = document.createElement('input');
+                    input.type = 'file'; input.accept = '.pdf';
+                    input.onchange = async (e) => {
+                        if (e.target.files[0]) {
+                            originalBytes = new Uint8Array(await e.target.files[0].arrayBuffer());
+                            executePdfRebuildProcess(originalBytes, record, null, action);
                         }
                     };
-                } catch(err) {
-                    console.warn('無法讀取舊記錄，載入全新表單', err);
-                    loadDefaultFields();
+                    input.click();
+                } else {
+                    executePdfRebuildProcess(originalBytes, record, null, action);
+                }
+            } catch (err) { alert('操作失敗: ' + err.message); }
+        }
+
+        async function executePdfRebuildProcess(originalBytes, record, fontCached, action) {
+            try {
+                const newDoc = await PDFLib.PDFDocument.load(originalBytes);
+                if (typeof fontkit !== 'undefined') newDoc.registerFontkit(fontkit);
+
+                let embeddedFont = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+                try {
+                    const fontRes = await fetch('font.ttf');
+                    if(fontRes.ok) embeddedFont = await newDoc.embedFont(new Uint8Array(await fontRes.arrayBuffer()));
+                } catch(e) {}
+
+                const page = newDoc.getPages()[0];
+                const snapshotFields = JSON.parse(record.fieldsSnapshot);
+
+                snapshotFields.forEach(f => {
+                    if (!f.content) return;
+                    if (f.content === '✔') {
+                        page.drawLine({ start: { x: f.x + 1, y: f.y + 2 }, end: { x: f.x + 4, y: f.y - 2 }, thickness: 1.8, color: PDFLib.rgb(0, 0, 0) });
+                        page.drawLine({ start: { x: f.x + 4, y: f.y - 2 }, end: { x: f.x + 9, y: f.y + 6.5 }, thickness: 1.8, color: PDFLib.rgb(0, 0, 0) });
+                    } else {
+                        page.drawText(f.content, { x: f.x, y: f.y, size: f.fontSize, font: embeddedFont, color: PDFLib.rgb(0, 0, 0) });
+                        if (f.label === '申請者') page.drawText(f.content, { x: 130, y: 61, size: f.fontSize, font: embeddedFont, color: PDFLib.rgb(0, 0, 0) });
+                    }
+                });
+
+                const finalPdfBytes = await newDoc.save();
+                const blobUrl = URL.createObjectURL(new Blob([finalPdfBytes], { type: 'application/pdf' }));
+                const fileName = record.filePath.split('/')[1] || 'Expense_Form.pdf';
+
+                if (action === 'view') {
+                    const viewerWin = window.open('', '_blank');
+                    viewerWin.document.write(`
+                        <html>
+                        <head>
+                            <title>預覽憑證 - ${record.item}</title>
+                            <style>body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; background: #333; }</style>
+                        </head>
+                        <body>
+                            <div style="background: #f8fafc; padding: 12px 24px; border-bottom: 1px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div>
+                                    <h2 style="margin: 0; font-size: 16px; color: #1e293b;">📄 ${record.item}</h2>
+                                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">申請人: ${record.userName} | 狀態: ${record.status}</p>
+                                </div>
+                                <a href="${blobUrl}" download="${fileName}" style="background: #059669; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">⬇️ 下載實體 PDF</a>
+                            </div>
+                            <iframe src="${blobUrl}" style="flex: 1; border: none; width: 100%;"></iframe>
+                        </body>
+                        </html>
+                    `);
+                    viewerWin.document.close();
+                }
+            } catch (err) { alert('PDF 渲染失敗：' + err.message); }
+        }
+
+        function exportToExcel() {
+            const exportData = viewableRecords.filter(r => !r.archived && (currentFilterGroup === 'ALL_SCHOOL' || r.group === currentFilterGroup));
+            if (exportData.length === 0) return alert('目前沒有未封存的數據可供匯出。');
+
+            const wb = XLSX.utils.book_new();
+            const today = new Date().toISOString().split('T')[0];
+
+            if (currentFilterGroup === 'ALL_SCHOOL') {
+                const depts = {}; let sumAll = 0;
+                exportData.forEach(r => { if(!depts[r.group])depts[r.group]=[]; depts[r.group].push(r); sumAll+=parseAmt(r.amount); });
+
+                const sRow = [['全校所有科組', `匯出者: ${currentUser.name}`], [`下載版本日期: ${today}`, `總支出金額: $${sumAll}`], [], ['科組名稱', '項目數量', '小計金額 (HKD)']];
+                for(let d in depts) sRow.push([d, depts[d].length, depts[d].reduce((s,x)=>s+parseAmt(x.amount),0)]);
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sRow), "各科總覽");
+
+                for(let d in depts) {
+                    const dSum = depts[d].reduce((s,x)=>s+parseAmt(x.amount),0);
+                    const dRow = [[d, `匯出者: ${currentUser.name}`], [`下載版本日期: ${today}`, `總支出金額: $${dSum}`], [], ['#', 'ID', '日期', '類別', '物品', '用途', '金額(HKD)', '申請人', '狀態', '備註']];
+                    depts[d].forEach((r, idx) => dRow.push([idx+1, r.id, r.date, r.category, r.item, r.purpose, parseAmt(r.amount), r.userName, r.status, (r.remarks||'').replace(/\n/g,' ')]));
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dRow), d);
                 }
             } else {
-                loadDefaultFields();
+                const dSum = exportData.reduce((s,x)=>s+parseAmt(x.amount),0);
+                const dRow = [[currentFilterGroup, `匯出者: ${currentUser.name}`], [`下載版本日期: ${today}`, `總支出金額: $${dSum}`], [], ['#', 'ID', '日期', '類別', '物品', '用途', '金額(HKD)', '申請人', '狀態', '備註']];
+                exportData.forEach((r, idx) => dRow.push([idx+1, r.id, r.date, r.category, r.item, r.purpose, parseAmt(r.amount), r.userName, r.status, (r.remarks||'').replace(/\n/g,' ')]));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dRow), currentFilterGroup);
             }
+            XLSX.writeFile(wb, `SchoolExpense_${currentFilterGroup}_${today}.xlsx`);
         }
 
-        function fastRefreshUI() {
-            const container = document.getElementById('fieldsContainer');
-            container.innerHTML = '';
-            const fragment = document.createDocumentFragment();
-            fields.forEach(f => { if(!f.isPreset) fragment.appendChild(createCustomFieldRowNode(f)); });
-            container.appendChild(fragment);
-            
-            renderPresetsPanel();
-            if(fields.length > 0) activeFieldId = fields[0].id;
-            highlightActiveRow();
-            if (pageRendered) scheduleRedraw();
-        }
-
-        ['Amount','Item','Purpose','Payee'].forEach(key => {
-            document.getElementById(`form${key}`).addEventListener('input', function() {
-                let f = fields.find(x => x.id === `sys_${key.toLowerCase()}`);
-                if(f) { 
-                    f.content = (key==='Amount' && this.value) ? '$' + this.value : this.value; 
-                    const r = document.querySelector(`.field-row[data-id="${f.id}"]`);
-                    if(r) r.querySelectorAll('input')[1].value = f.content;
-                    scheduleRedraw(); 
-                }
-            });
-        });
-
-        async function renderCanvasLayout() {
-            if (!pdfJsDoc) return;
-            const page = await pdfJsDoc.getPage(1);
-            const vp = page.getViewport({ scale: 1.5 });
-            pageWidth = vp.width; pageHeight = vp.height;
-            canvas.width = pageWidth; canvas.height = pageHeight;
-            offscreenCache = document.createElement('canvas'); offscreenCache.width = pageWidth; offscreenCache.height = pageHeight;
-            await page.render({ canvasContext: offscreenCache.getContext('2d'), viewport: vp }).promise;
-            pageRendered = true; scheduleRedraw();
-        }
-
-        let redrawTimer = null;
-        function scheduleRedraw() {
-            if (!pageRendered) return;
-            if (redrawTimer) clearTimeout(redrawTimer);
-            redrawTimer = setTimeout(() => {
-                ctx.clearRect(0,0, canvas.width, canvas.height); ctx.drawImage(offscreenCache, 0,0);
-                fields.forEach(f => {
-                    if(!f.content) return;
-                    const cX = f.x * 1.5, cY = ((pageHeight/1.5) - f.y) * 1.5;
-                    ctx.font = `${f.fontSize * 1.5}px sans-serif`; ctx.fillStyle = f.id === activeFieldId ? '#2563eb' : '#dc2626';
-                    ctx.fillText(f.content, cX, cY); ctx.beginPath(); ctx.arc(cX, cY, 4, 0, 2*Math.PI); ctx.fill();
-                });
-            }, 50);
-        }
-
-        canvas.addEventListener('click', e => {
-            if(!pageRendered) return;
-            const rect = canvas.getBoundingClientRect(); const scale = canvas.width / rect.width;
-            const pdfX = Math.round(((e.clientX - rect.left) * scale) / 1.5);
-            const pdfY = Math.round((canvas.height - ((e.clientY - rect.top) * scale)) / 1.5);
-            if(activeFieldId !== null) {
-                let f = fields.find(x => x.id === activeFieldId);
-                if(f) { 
-                    f.x = pdfX; f.y = pdfY; 
-                    const r = document.querySelector(`.field-row[data-id="${activeFieldId}"]`);
-                    if(r) { r.querySelectorAll('input')[2].value = pdfX; r.querySelectorAll('input')[3].value = pdfY; }
-                    scheduleRedraw(); 
-                }
-            }
-        });
-
-        // 打勾與自訂欄位控制
-        function togglePresetFieldObject(p) {
-            const pid = 'preset_' + p.id;
-            if (p.checked) { 
-                if (!fields.some(x => x.id === pid)) fields.push({ id: pid, label: '✔ ' + p.label, x: p.x, y: p.y, fontSize: p.fontSize, content: '✔', isPreset: true }); 
-                if (p.id === 'type_subsidy' && !fields.some(x => x.id === 'text_type_subsidy')) fields.push({ id: 'text_type_subsidy', label: '津貼/資助說明', x: 172, y: 519, fontSize: 12, content: '', isSystem: false });
-                if (p.id === 'type_other' && !fields.some(x => x.id === 'text_type_other')) fields.push({ id: 'text_type_other', label: '其他說明', x: 170, y: 503, fontSize: 12, content: '', isSystem: false });
-                activeFieldId = pid;
-            } else { 
-                fields = fields.filter(x => x.id !== pid); 
-                if (p.id === 'type_subsidy') fields = fields.filter(x => x.id !== 'text_type_subsidy');
-                if (p.id === 'type_other') fields = fields.filter(x => x.id !== 'text_type_other');
-            }
-            fastRefreshUI();
-        }
-
-        function renderPresetsPanel() {
-            const container = document.getElementById('presetsContainer'); container.innerHTML = '';
-            checkboxPresets.forEach(p => {
-                const wrap = document.createElement('label'); wrap.className = `flex items-center gap-1.5 p-2 rounded border text-xs cursor-pointer ${('preset_'+p.id)===activeFieldId?'bg-blue-50 border-blue-500':'bg-slate-50'}`;
-                const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = p.checked;
-                chk.onchange = () => { p.checked = chk.checked; togglePresetFieldObject(p); };
-                wrap.appendChild(chk); wrap.appendChild(document.createTextNode(p.label));
-                container.appendChild(wrap);
-            });
-        }
-
-        function createCustomFieldRowNode(f) {
-            const row = document.createElement('div'); row.className = `field-row border rounded-lg p-2 text-xs flex flex-col gap-1 bg-white`;
-            row.dataset.id = f.id;
-            row.onclick = (e) => { if(e.target.tagName!=='INPUT') { activeFieldId = f.id; highlightActiveRow(); scheduleRedraw(); } };
-            row.innerHTML = `
-                <div class="flex justify-between"><input value="${f.label}" onchange="updateField('${f.id}','label',this.value)" class="w-24 font-bold bg-transparent">
-                ${f.isSystem?'':'<button class="text-rose-500" onclick="removeField(\''+f.id+'\')"><i class="fa-solid fa-trash"></i></button>'}</div>
-                <input value="${f.content}" onchange="updateField('${f.id}','content',this.value)" class="w-full border rounded px-1 focus:ring-1 focus:ring-blue-500">
-                <div class="flex gap-1 text-[10px] text-slate-500">X:<input value="${f.x}" type="number" class="w-10 border rounded px-1" onchange="updateField('${f.id}','x',this.value)"> Y:<input value="${f.y}" type="number" class="w-10 border rounded px-1" onchange="updateField('${f.id}','y',this.value)"> S:<input value="${f.fontSize}" type="number" class="w-10 border rounded px-1" onchange="updateField('${f.id}','fontSize',this.value)"></div>
-            `;
-            return row;
-        }
-
-        function highlightActiveRow() {
-            document.querySelectorAll('.field-row').forEach(r => {
-                r.classList.remove('border-blue-500', 'bg-blue-50');
-                if(r.dataset.id == activeFieldId) r.classList.add('border-blue-500', 'bg-blue-50');
-            });
-        }
-
-        window.updateField = (id, k, v) => { let f=fields.find(x=>x.id===id); if(f){ f[k]= k==='label'||k==='content'?v:parseFloat(v); scheduleRedraw();} };
-        window.removeField = (id) => { fields = fields.filter(x=>x.id!==id); fastRefreshUI(); };
-        document.getElementById('addFieldBtn').onclick = () => { fields.push({id:nextId++, label:'新欄位', x:100, y:400, fontSize:13, content:'', isSystem:false}); fastRefreshUI(); };
-
-        // 手動備用上傳 (支援 GitHub 載入失敗時)
-        let rootDirHandle = null;
-        document.getElementById('deployBtn').addEventListener('click', async () => {
-            try {
-                rootDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                document.getElementById('deployStatus').innerHTML = `🟢 已連接: ${rootDirHandle.name}`;
-            } catch(e) {}
-        });
-
-        document.getElementById('pdfUpload').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            try {
-                setStatus('正在解析...', 'loading');
-                originalPdfBytes = new Uint8Array(await file.arrayBuffer());
-                pdfJsDoc = await pdfjsLib.getDocument({ data: originalPdfBytes }).promise;
-                await renderCanvasLayout();
-                setStatus(`載入成功 (${file.name})`, 'success');
-            } catch (err) { setStatus('載入失敗: ' + err.message, 'error'); }
-        });
-
-        document.getElementById('fontUpload').addEventListener('change', async e => {
-            if(!e.target.files[0]) return;
-            customFontBytes = new Uint8Array(await e.target.files[0].arrayBuffer());
-            document.getElementById('downloadBtnText').textContent = "🟢 本地字型就緒";
-        });
-
-        // 提交與 PDF 產生
-        async function buildModifiedPdfBinary() {
-            if (!originalPdfBytes) throw new Error('尚未載入 PDF 範本');
-            const newDoc = await PDFLib.PDFDocument.load(originalPdfBytes);
-            if (typeof fontkit !== 'undefined') newDoc.registerFontkit(fontkit);
-            const font = customFontBytes ? await newDoc.embedFont(customFontBytes) : await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-            const page = newDoc.getPages()[0];
-            
-            fields.forEach(f => {
-                if (!f.content) return;
-                if (f.content === '✔') {
-                    page.drawLine({ start: { x: f.x + 1, y: f.y + 2 }, end: { x: f.x + 4, y: f.y - 2 }, thickness: 1.8, color: PDFLib.rgb(0, 0, 0) });
-                    page.drawLine({ start: { x: f.x + 4, y: f.y - 2 }, end: { x: f.x + 9, y: f.y + 6.5 }, thickness: 1.8, color: PDFLib.rgb(0, 0, 0) });
-                } else {
-                    page.drawText(f.content, { x: f.x, y: f.y, size: f.fontSize, font: font, color: PDFLib.rgb(0, 0, 0) });
-                    if (f.label === '申請者') { page.drawText(f.content, { x: 130, y: 61, size: f.fontSize, font: font, color: PDFLib.rgb(0, 0, 0) }); }
-                }
-            });
-            return await newDoc.save();
-        }
-
-        document.getElementById('applyBtn').onclick = () => { 
-            if(originalPdfBytes) scheduleRedraw(); else alert('尚未連線伺服器載入 PDF'); 
-        };
-
-        document.getElementById('submitBtn').onclick = async () => {
-            const cat = document.getElementById('formCategory').value, amt = document.getElementById('formAmount').value, pur = document.getElementById('formPurpose').value;
-            if(!cat || !amt || !pur || !originalPdfBytes) return alert('請確認必填欄位並已載入 PDF 範本！');
-            
-            setStatus('正在生成並寫入資料庫...', 'loading');
-            
-            try {
-                modifiedPdfBytes = await buildModifiedPdfBinary();
-                const fn = `${todayStr.replace(/-/g,'')}_${pur.substring(0,8)}.pdf`;
-                let finalFilePath = '';
-                
-                if (rootDirHandle) {
-                    const dateDir = await rootDirHandle.getDirectoryHandle(todayStr, {create:true});
-                    const fileHandle = await dateDir.getFileHandle(isEditMode?`(修改)${fn}`:fn, {create:true});
-                    const w = await fileHandle.createWritable(); await w.write(modifiedPdfBytes); await w.close();
-                    finalFilePath = `${rootDirHandle.name}/${todayStr}/${isEditMode?`(修改)${fn}`:fn}`;
-                } else {
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(new Blob([modifiedPdfBytes], { type: 'application/pdf' }));
-                    a.download = isEditMode ? `(修改)${fn}` : fn;
-                    a.click();
-                    finalFilePath = `伺服器已自動備份: ${isEditMode ? `(修改)${fn}` : fn}`;
-                }
-
-                let db;
-                try {
-                    db = await initDB();
-                } catch(e) { throw new Error("資料庫連接失敗"); }
-
-                const tx = db.transaction('expenses', 'readwrite');
-                const record = {
-                    userId: currentUser.id, userName: currentUser.name, group: currentUser.group, date: todayStr,
-                    category: cat, amount: amt ? '$' + amt : '$0', item: document.getElementById('formItem').value, purpose: pur, payee: document.getElementById('formPayee').value,
-                    status: '待審核', remarks: '', archived: false, filePath: finalFilePath, fieldsSnapshot: JSON.stringify(fields)
-                };
-                if(isEditMode) record.id = parseInt(editId);
-                
-                tx.objectStore('expenses').put(record).onsuccess = () => { 
-                    setStatus('✅ 提交成功！', 'success');
-                    document.getElementById('postSubmitActions').classList.remove('hidden');
-                    document.getElementById('postSubmitActions').classList.add('grid');
-
-                    const overlay = document.createElement('div');
-                    overlay.className = 'fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4';
-                    overlay.innerHTML = `
-                        <div class="bg-white rounded-xl p-6 max-w-sm w-full text-center shadow-2xl space-y-4">
-                            <div class="text-emerald-500 text-4xl"><i class="fa-solid fa-circle-check"></i></div>
-                            <h3 class="text-lg font-bold text-slate-800">支出項目提交成功</h3>
-                            <p class="text-xs text-slate-500">系統記錄已更新。<br>您可於下方進行預覽或下載。</p>
-                            <div class="pt-2 space-y-2">
-                                <button onclick="document.getElementById('previewModifiedBtn').click(); this.closest('.fixed').remove();" class="w-full bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-lg shadow">👁️ 顯示實體 PDF 預覽</button>
-                                <button onclick="document.getElementById('exportPdfBtn').click()" class="w-full bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-lg shadow">⬇️ 下載本機 PDF</button>
-                                <a href="overview.html" class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 rounded-lg shadow mt-2">📊 前往開支總概覽</a>
-                                <button onclick="this.closest('.fixed').remove()" class="block w-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-2.5 rounded-lg">繼續停留</button>
-                            </div>
-                        </div>`;
-                    document.body.appendChild(overlay);
-                };
-            } catch(e) { setStatus('處理失敗', 'error'); alert('失敗: ' + e); }
-        };
-
-        document.getElementById('previewModifiedBtn').addEventListener('click', () => {
-            const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
-            document.getElementById('modifiedPdfPreview').src = URL.createObjectURL(blob);
-            document.getElementById('previewIframeContainer').classList.remove('hidden');
-            document.getElementById('previewIframeContainer').scrollIntoView({ behavior: 'smooth' });
-        });
-
-        document.getElementById('exportPdfBtn').addEventListener('click', () => {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([modifiedPdfBytes], { type: 'application/pdf' }));
-            a.download = `Expense_${todayStr}.pdf`;
-            a.click();
-        });
-
-        window.onload = initData;
+        window.onload = loadData;
     </script>
 </body>
 </html>

@@ -89,7 +89,8 @@
             </div>
 
             <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
-                <button id="submitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3.5 rounded-lg flex justify-center gap-2 shadow-lg"><i class="fa-solid fa-cloud-arrow-up"></i> ✅ 提交並儲存至學校系統</button>
+                <button id="applyBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3 rounded-lg flex justify-center gap-2"><i class="fa-solid fa-pen-nib"></i> 僅更新並重繪預覽畫布</button>
+                <button id="submitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3.5 rounded-lg flex justify-center gap-2 mt-2 shadow-lg"><i class="fa-solid fa-cloud-arrow-up"></i> ✅ 提交並儲存至學校系統</button>
                 
                 <div id="postSubmitActions" class="hidden grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100">
                     <button id="previewModifiedBtn" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5"><i class="fa-solid fa-eye"></i> 顯示下方實體預覽</button>
@@ -117,6 +118,7 @@
     </main>
 
     <script>
+        // 1. 強制登入防護阻斷
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
         if (!currentUser) {
             window.location.href = 'index.html';
@@ -158,7 +160,16 @@
         document.getElementById('infoGroup').textContent = currentUser.group;
         document.getElementById('infoManager').textContent = currentUser.manager;
 
-        // 升級到版本 4 強制刷新 GitHub 
+        function setStatus(msg, type = 'info') {
+            const statusSpan = document.getElementById('systemStatus');
+            statusSpan.className = "px-3 py-1.5 rounded-full text-xs font-semibold border flex items-center gap-1.5 ";
+            if (type === 'error') { statusSpan.classList.add('bg-rose-100', 'text-rose-800', 'border-rose-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${msg}`; }
+            else if (type === 'success') { statusSpan.classList.add('bg-emerald-100', 'text-emerald-800', 'border-emerald-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg}`; }
+            else if (type === 'loading') { statusSpan.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> ${msg}`; }
+            else { statusSpan.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-200'); statusSpan.innerHTML = `<i class="fa-solid fa-info-circle"></i> ${msg}`; }
+        }
+
+        // 🌟 升級資料庫至 Version 4，確保跨平台百分百覆蓋
         function initDB() {
             return new Promise((resolve, reject) => {
                 const req = indexedDB.open('SchoolExpenseDB', 4);
@@ -206,9 +217,15 @@
 
         async function initData() {
             await loadServerAssets();
-            let db = await initDB();
-            const targetId = editId || dupId;
+            let db;
+            try {
+                db = await initDB();
+            } catch(e) {
+                loadDefaultFields();
+                return;
+            }
 
+            const targetId = editId || dupId;
             if (targetId) {
                 try {
                     const tx = db.transaction(['expenses'], 'readonly');
@@ -232,10 +249,16 @@
                             }
                             checkboxPresets.forEach(p => { p.checked = fields.some(f => f.id === 'preset_' + p.id); });
                             fastRefreshUI();
+                        } else {
+                            // 🌟 核心修正點：如果在新環境找不到舊 ID 紀錄，啟動安全 fallback 機制
+                            loadDefaultFields();
                         }
                     };
+                    tx.onerror = () => { loadDefaultFields(); };
                 } catch(err) { loadDefaultFields(); }
-            } else { loadDefaultFields(); }
+            } else {
+                loadDefaultFields();
+            }
         }
 
         function fastRefreshUI() {
@@ -253,7 +276,7 @@
             document.getElementById(`form${key}`).addEventListener('input', function() {
                 let f = fields.find(x => x.id === `sys_${key.toLowerCase()}`);
                 if(f) { 
-                    f.content = (key=='Amount' && this.value) ? '$' + this.value : this.value; // 🌟 智慧前置加 $
+                    f.content = (key=='Amount' && this.value) ? '$' + this.value : this.value; 
                     const r = document.querySelector(`.field-row[data-id="${f.id}"]`);
                     if(r) r.querySelectorAll('input')[1].value = f.content;
                     scheduleRedraw(); 
@@ -373,7 +396,10 @@
             return await newDoc.save();
         }
 
-        // 🌟 原「重繪按鈕」已徹底刪除，簡化前端操作
+        document.getElementById('applyBtn').onclick = () => { 
+            if(originalPdfBytes) scheduleRedraw(); else alert('尚未連線伺服器或載入 PDF'); 
+        };
+
         document.getElementById('submitBtn').onclick = async () => {
             const cat = document.getElementById('formCategory').value, amt = document.getElementById('formAmount').value, pur = document.getElementById('formPurpose').value;
             if(!cat || !amt || !pur || !originalPdfBytes) return alert('請確認必填欄位！');

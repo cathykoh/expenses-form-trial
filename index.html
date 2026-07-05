@@ -3,25 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登入 - 學校支出管理系統</title>
+    <title>登入 - 學校支出 management 系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 font-sans">
     <div class="max-w-md w-full bg-white rounded-xl shadow-lg border border-slate-200 p-8">
-        <div class="text-center mb-8">
+        
+        <div class="text-center mb-8 cursor-pointer select-none" id="loginHeader" onclick="handleHeaderClick()">
             <div class="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-md">
                 <i class="fa-solid fa-school text-2xl"></i>
             </div>
             <h1 class="text-2xl font-bold text-slate-800">學校財務審批系統</h1>
             <p class="text-sm text-slate-500 mt-2">請選擇使用者身份登入</p>
         </div>
+
         <form id="loginForm" class="space-y-5">
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">使用者身份</label>
                 <select id="userSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-700 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <!-- 動態載入 -->
-                </select>
+                    </select>
             </div>
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">密碼</label>
@@ -35,7 +36,6 @@
     </div>
 
     <script>
-        // 修正：加入了 password: '1234'，否則系統驗證不到預設密碼
         const defaultUsers = {
             'user1': { id: 'user1', password: '1234', name: '張永成', role: 'TE科 panel', group: 'TE科' },
             'user2': { id: 'user2', password: '1234', name: '李小明', role: 'TE科 Teacher', group: 'TE科' },
@@ -45,22 +45,42 @@
             'sysadmin': { id: 'sysadmin', password: '1234', name: '系統管理員', role: '系統維護', group: 'IT組' }
         };
 
-        // 自動檢查並加載管理員上傳嘅 Excel 最新名單
         const storedUsers = localStorage.getItem('schoolDynamicUsers');
         const users = storedUsers ? JSON.parse(storedUsers) : defaultUsers;
 
-        // 自動渲染登入下拉選單
-        window.onload = function() {
-            if (localStorage.getItem('currentUser')) window.location.href = 'main.html';
-            
+        // 智慧渲染選單：預設完全隱藏 sysadmin
+        function renderUserDropdown() {
             const select = document.getElementById('userSelect');
             select.innerHTML = ''; 
             for (let id in users) {
+                if (id === 'sysadmin') continue; // 🌟 隱藏管理員
                 const opt = document.createElement('option');
                 opt.value = id;
                 opt.textContent = `${id} (${users[id].name} / ${users[id].role})`;
                 select.appendChild(opt);
             }
+        }
+
+        // 🌟 方案 A 暗門機關：連點 3 次標題區觸發
+        let headerClicks = 0;
+        function handleHeaderClick() {
+            headerClicks++;
+            if (headerClicks === 3) {
+                const select = document.getElementById('userSelect');
+                if (!select.querySelector('option[value="sysadmin"]')) {
+                    const opt = document.createElement('option');
+                    opt.value = 'sysadmin';
+                    opt.textContent = `sysadmin (${users['sysadmin'].name} / ${users['sysadmin'].role})`;
+                    select.appendChild(opt);
+                    select.value = 'sysadmin'; // 自動選取
+                    alert('🛠️ 系統管理員暗門已成功開啟！');
+                }
+            }
+        }
+
+        window.onload = function() {
+            if (localStorage.getItem('currentUser')) window.location.href = 'main.html';
+            renderUserDropdown();
         };
 
         document.getElementById('loginForm').addEventListener('submit', function(e) {
@@ -69,14 +89,12 @@
             const password = document.getElementById('passwordInput').value;
             const errorMsg = document.getElementById('errorMsg');
 
-            // 驗證密碼
             if (users[selectedId] && password === users[selectedId].password) {
                 errorMsg.className = "hidden";
                 localStorage.setItem('currentUser', JSON.stringify(users[selectedId]));
                 window.location.href = 'main.html';
             } else {
-                errorMsg.classList.remove('hidden');
-                errorMsg.classList.add('block');
+                errorMsg.className = "text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-3 text-center block";
             }
         });
     </script>

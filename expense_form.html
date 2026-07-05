@@ -130,8 +130,10 @@
         let customFontBytes = null, pageHeight = 0;
         
         const urlParams = new URLSearchParams(window.location.search);
-        let editId = urlParams.get('editId'); let dupId = urlParams.get('dupId');
-        let isEditMode = !!editId; let isDupMode = !!dupId;
+        let editId = urlParams.get('editId');
+        let dupId = urlParams.get('dupId');
+        let isEditMode = !!editId;
+        let isDupMode = !!dupId;
 
         if (isEditMode) document.getElementById('pageTitle').textContent = "✏️ 重新編輯並提交";
         if (isDupMode) document.getElementById('pageTitle').textContent = "📑 複製新增項目";
@@ -163,23 +165,28 @@
             if (type === 'error') { statusSpan.classList.add('bg-rose-100', 'text-rose-800', 'border-rose-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${msg}`; }
             else if (type === 'success') { statusSpan.classList.add('bg-emerald-100', 'text-emerald-800', 'border-emerald-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg}`; }
             else if (type === 'loading') { statusSpan.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-200'); statusSpan.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> ${msg}`; }
+            else { statusSpan.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-200'); statusSpan.innerHTML = `<i class="fa-solid fa-info-circle"></i> ${msg}`; }
         }
 
+        // 🌟 修正點：加入 onupgradeneeded 保護機制，防止新環境下崩潰
         function initDB() {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 const req = indexedDB.open('SchoolExpenseDB', 2);
+                req.onupgradeneeded = e => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('expenses')) db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
+                    if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+                };
                 req.onsuccess = e => resolve(e.target.result);
+                req.onerror = e => reject(e.target.error);
             });
         }
 
-        // 🌟 自動從 GitHub / 伺服器載入 PDF 及字型
         async function loadServerAssets() {
             try {
-                // 載入字型
                 const fontRes = await fetch('font.ttf');
                 if (fontRes.ok) customFontBytes = new Uint8Array(await fontRes.arrayBuffer());
 
-                // 載入 PDF
                 const pdfRes = await fetch('template.pdf');
                 if (!pdfRes.ok) throw new Error('伺服器找不到 template.pdf');
                 originalPdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
@@ -194,14 +201,13 @@
         }
 
         async function initData() {
-            // 先嘗試自動連線讀取資產
             await loadServerAssets();
 
             const db = await initDB();
-            const tx = db.transaction(['expenses'], 'readonly');
-            
             const targetId = editId || dupId;
+
             if (targetId) {
+                const tx = db.transaction(['expenses'], 'readonly');
                 tx.objectStore('expenses').get(parseInt(targetId)).onsuccess = e => {
                     const record = e.target.result;
                     if(record) {
@@ -393,7 +399,7 @@
                 modifiedPdfBytes = await buildModifiedPdfBinary();
                 const fn = `${todayStr.replace(/-/g,'')}_${pur.substring(0,8)}.pdf`;
                 
-                // 直接觸發瀏覽器下載
+                // GitHub 版本：直接觸發瀏覽器下載實體 PDF
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(new Blob([modifiedPdfBytes], { type: 'application/pdf' }));
                 a.download = isEditMode ? `(修改)${fn}` : fn;
@@ -409,6 +415,7 @@
                     status: '待審核', remarks: '', archived: false, filePath: finalFilePath, fieldsSnapshot: JSON.stringify(fields)
                 };
                 if(isEditMode) record.id = parseInt(editId);
+                
                 tx.objectStore('expenses').put(record).onsuccess = () => { 
                     setStatus('✅ 提交成功！', 'success');
                     

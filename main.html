@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主選單 - 學校支出管理系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 SheetJS 負責讀取與匯出名單 Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col font-sans">
+    <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg"><i class="fa-solid fa-school text-lg"></i></div>
+                <h1 class="text-xl font-bold tracking-tight text-slate-900">學校財務系統</h1>
+            </div>
+            <button id="logoutBtn" class="text-sm font-semibold text-slate-500 hover:text-rose-600 flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> 登出
+            </button>
+        </div>
+    </header>
+    
+    <main class="flex-1 max-w-4xl w-full mx-auto p-6 mt-6">
+        <div class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm mb-6 text-center">
+            <h2 class="text-3xl font-bold text-slate-800 mb-2">歡迎，<span id="userNameDisplay" class="text-blue-600"></span></h2>
+            <p class="text-slate-500 flex justify-center items-center gap-2">
+                <i class="fa-solid fa-id-badge"></i> <span id="userRoleDisplay" class="font-semibold bg-slate-100 px-2 py-1 rounded text-slate-700"></span>
+            </p>
+        </div>
+        <div id="actionContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </main>
+
+    <!-- 🌟 新增：同事架構表浮動視窗 (Modal) -->
+    <div id="rosterModal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <h2 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sitemap text-blue-500 mr-2"></i> 同事架構與權限表</h2>
+                <button onclick="closeRosterModal()" class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 custom-scrollbar">
+                <table class="w-full text-left text-sm border-collapse border border-slate-200">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600">
+                            <th class="p-2 border border-slate-200">ID</th>
+                            <th class="p-2 border border-slate-200">姓名</th>
+                            <th class="p-2 border border-slate-200">角色職位</th>
+                            <th class="p-2 border border-slate-200">所屬科組</th>
+                            <th class="p-2 border border-slate-200">直屬上級 ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rosterTableBody" class="text-slate-700">
+                        <!-- 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
+                <span class="text-xs text-slate-500">提示：系統預設密碼均為 1234。</span>
+                <div class="flex gap-3">
+                    <button onclick="exportRosterExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg shadow font-bold text-sm transition-colors"><i class="fa-solid fa-file-excel"></i> 匯出 Excel</button>
+                    <button onclick="closeRosterModal()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow font-bold text-sm transition-colors">關閉</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser) window.location.href = 'index.html';
+        document.getElementById('userNameDisplay').textContent = currentUser.name;
+        document.getElementById('userRoleDisplay').textContent = currentUser.role;
+        document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.clear(); window.location.href = 'index.html'; });
+
+        function initDB() {
+            return new Promise((resolve) => {
+                const request = indexedDB.open('SchoolExpenseDB', 2);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('expenses')) db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
+                    if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+            });
+        }
+
+        const container = document.getElementById('actionContainer');
+        if (currentUser.id === 'sysadmin') {
+            container.className = "grid grid-cols-1 gap-6 max-w-2xl mx-auto";
+            container.innerHTML = `
+                <div class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm text-center space-y-6">
+                    <div>
+                        <div class="bg-slate-100 text-slate-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fa-solid fa-server text-2xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">系統維護與核心數據管理</h3>
+                        <p class="text-xs text-slate-500">可在此處進行學年數據備份，或者管理校內全體同事從屬關係名單。</p>
+                    </div>
+
+                    <div class="border-t border-b border-slate-100 py-4 text-left space-y-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-bold text-slate-700"><i class="fa-solid fa-users text-blue-600 mr-1"></i> 👥 同事架構與權限管理</label>
+                            <button onclick="openRosterModal()" class="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold"><i class="fa-solid fa-eye"></i> 檢視架構表</button>
+                        </div>
+                        <p class="text-[11px] text-slate-400">上傳包含 ID, Password, Name, Role, Group, ManagerID 欄位的 Excel 檔。系統會自動重構權限從屬樹。</p>
+                        <input type="file" id="userRosterInput" accept=".xlsx, .xls" class="text-xs w-full text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer" onchange="importUserRoster(event)">
+                    </div>
+
+                    <div class="flex flex-wrap justify-center gap-3 pt-2">
+                        <button onclick="backupData()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 px-4 rounded shadow transition-colors"><i class="fa-solid fa-download"></i> 匯出系統備份 (.json)</button>
+                        <button onclick="document.getElementById('restoreInput').click()" class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2.5 px-4 rounded shadow transition-colors"><i class="fa-solid fa-upload"></i> 還原舊有備份</button>
+                        <input type="file" id="restoreInput" accept=".json" class="hidden" onchange="restoreData(event)">
+                        <button onclick="clearData()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded shadow transition-colors"><i class="fa-solid fa-trash-can"></i> 清空支出資料</button>
+                    </div>
+                </div>`;
+        } else if (currentUser.id === 'accountant') {
+            container.className = "grid grid-cols-1 gap-6 max-w-lg mx-auto";
+            container.innerHTML = `
+                <a href="overview.html" class="group block bg-white rounded-xl p-8 border border-rose-200 shadow hover:shadow-lg hover:border-rose-400 transition-all text-center">
+                    <div class="bg-rose-50 text-rose-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-shield-halved text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">🛡️ 進入審批管理後台</h3>
+                    <p class="text-sm text-slate-500">查閱全校各科支出、控管批核狀態與撰寫審理備註。</p>
+                </a>`;
+        } else {
+            container.innerHTML = `
+                <a href="expense_form.html" class="group block bg-white rounded-xl p-8 border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-400 transition-all text-center">
+                    <div class="bg-emerald-50 text-emerald-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-file-pen text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">📝 新增支出項目</h3>
+                    <p class="text-sm text-slate-500">填寫並產生 PDF 申請表，提交開支申請。</p>
+                </a>
+                <a href="overview.html" class="group block bg-white rounded-xl p-8 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-400 transition-all text-center">
+                    <div class="bg-indigo-50 text-indigo-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-chart-pie text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">📊 概覽與狀態列表</h3>
+                    <p class="text-sm text-slate-500">查看審核進度、下載 PDF 及查看備註。</p>
+                </a>`;
+        }
+
+        // ----- 同事架構表 Modal 功能 -----
+        const defaultUsers = {
+            'user1': { id: 'user1', name: '張永成', role: 'TE科 panel', group: 'TE科', managerId: 'user4' },
+            'user2': { id: 'user2', name: '李小明', role: 'TE科 Teacher', group: 'TE科', managerId: 'user1' },
+            'user3': { id: 'user3', name: '王美美', role: '閱讀科 Panel', group: '閱讀科', managerId: 'user4' },
+            'user4': { id: 'user4', name: '趙統籌', role: 'T&L 統籌', group: '教務組', managerId: 'None' },
+            'accountant': { id: 'accountant', name: '會計員', role: '財務批核', group: '管理層', managerId: 'None' },
+            'sysadmin': { id: 'sysadmin', name: '系統管理員', role: '系統維護', group: 'IT組', managerId: 'None' }
+        };
+        const currentRoster = JSON.parse(localStorage.getItem('schoolDynamicUsers')) || defaultUsers;
+
+        function openRosterModal() {
+            const tbody = document.getElementById('rosterTableBody');
+            tbody.innerHTML = '';
+            for (let id in currentRoster) {
+                const user = currentRoster[id];
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-2 border border-slate-200 font-mono text-blue-600 font-bold">${user.id}</td>
+                        <td class="p-2 border border-slate-200 font-bold">${user.name}</td>
+                        <td class="p-2 border border-slate-200">${user.role}</td>
+                        <td class="p-2 border border-slate-200"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">${user.group}</span></td>
+                        <td class="p-2 border border-slate-200 font-mono text-slate-500">${user.managerId || 'None'}</td>
+                    </tr>
+                `;
+            }
+            document.getElementById('rosterModal').classList.remove('hidden');
+        }
+
+        function closeRosterModal() { document.getElementById('rosterModal').classList.add('hidden'); }
+
+        function exportRosterExcel() {
+            const wb = XLSX.utils.book_new();
+            const wsData = [['ID', 'Name', 'Role', 'Group', 'ManagerID']];
+            for (let id in currentRoster) {
+                const u = currentRoster[id];
+                wsData.push([u.id, u.name, u.role, u.group, u.managerId || 'None']);
+            }
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws['!cols'] = [{wch: 15}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 15}];
+            XLSX.utils.book_append_sheet(wb, ws, "同事架構表");
+            XLSX.writeFile(wb, `School_Roster_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+
+        function importUserRoster(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = evt.target.result;
+                    const workbook = XLSX.read(data, {type: 'binary'});
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    
+                    if (json.length === 0 || !json[0].hasOwnProperty('ID') || !json[0].hasOwnProperty('Name')) {
+                        throw new Error('Excel 格式不符！請確保包含 ID, Password, Name, Role, Group, ManagerID 欄位。');
+                    }
+                    const dynamicUsers = {};
+                    json.forEach(row => {
+                        if(row.ID) {
+                            dynamicUsers[String(row.ID).trim()] = {
+                                id: String(row.ID).trim(), password: String(row.Password || '1234').trim(),
+                                name: String(row.Name).trim(), role: String(row.Role || '').trim(),
+                                group: String(row.Group || '').trim(), managerId: String(row.ManagerID || 'None').trim()
+                            };
+                        }
+                    });
+                    localStorage.setItem('schoolDynamicUsers', JSON.stringify(dynamicUsers));
+                    alert(`🎉 成功批量匯入 ${Object.keys(dynamicUsers).length} 位全校同事名單！從屬結構已即時生效。`);
+                    window.location.reload(); // 重整以載入新名單
+                } catch(err) { alert('❌ 匯入失敗：' + err.message); }
+            };
+            reader.readAsBinaryString(file);
+        }
+
+        // 系統備份
+        async function backupData() {
+            const db = await initDB();
+            const tx = db.transaction('expenses', 'readonly');
+            tx.objectStore('expenses').getAll().onsuccess = e => {
+                const blob = new Blob([JSON.stringify(e.target.result)], {type: 'application/json'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `SchoolExpense_Backup_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+            };
+        }
+        async function restoreData(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    const db = await initDB();
+                    const tx = db.transaction('expenses', 'readwrite');
+                    const store = tx.objectStore('expenses');
+                    data.forEach(item => store.put(item));
+                    tx.oncomplete = () => alert('✅ 資料還原成功！');
+                } catch(err) { alert('❌ 還原失敗'); }
+            };
+            reader.readAsText(file);
+        }
+        async function clearData() {
+            if(!confirm('⚠️ 確定要清空所有開支紀錄嗎？操作不可復原！')) return;
+            const db = await initDB();
+            db.transaction('expenses', 'readwrite').objectStore('expenses').clear().onsuccess = () => alert('✅ 資料庫已清空！');
+        }
+    </script>
+</body>
+</html>

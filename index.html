@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入 - 學校支出管理系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 font-sans">
+    <div class="max-w-md w-full bg-white rounded-xl shadow-lg border border-slate-200 p-8">
+        <div class="text-center mb-8">
+            <div class="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-md">
+                <i class="fa-solid fa-school text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800">學校財務審批系統</h1>
+            <p class="text-sm text-slate-500 mt-2">請選擇使用者身份登入</p>
+        </div>
+        <form id="loginForm" class="space-y-5">
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">使用者身份</label>
+                <select id="userSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-700 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <!-- 動態載入 -->
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">密碼</label>
+                <input type="password" id="passwordInput" value="1234" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div id="errorMsg" class="hidden text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-3 text-center">密碼錯誤。</div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2">
+                <i class="fa-solid fa-right-to-bracket"></i> 登入系統
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // 修正：加入了 password: '1234'，否則系統驗證不到預設密碼
+        const defaultUsers = {
+            'user1': { id: 'user1', password: '1234', name: '張永成', role: 'TE科 panel', group: 'TE科' },
+            'user2': { id: 'user2', password: '1234', name: '李小明', role: 'TE科 Teacher', group: 'TE科' },
+            'user3': { id: 'user3', password: '1234', name: '王美美', role: '閱讀科 Panel', group: '閱讀科' },
+            'user4': { id: 'user4', password: '1234', name: '趙統籌', role: 'T&L 統籌', group: '教務組' },
+            'accountant': { id: 'accountant', password: '1234', name: '會計員', role: '財務批核', group: '管理層' },
+            'sysadmin': { id: 'sysadmin', password: '1234', name: '系統管理員', role: '系統維護', group: 'IT組' }
+        };
+
+        // 自動檢查並加載管理員上傳嘅 Excel 最新名單
+        const storedUsers = localStorage.getItem('schoolDynamicUsers');
+        const users = storedUsers ? JSON.parse(storedUsers) : defaultUsers;
+
+        // 自動渲染登入下拉選單
+        window.onload = function() {
+            if (localStorage.getItem('currentUser')) window.location.href = 'main.html';
+            
+            const select = document.getElementById('userSelect');
+            select.innerHTML = ''; 
+            for (let id in users) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = `${id} (${users[id].name} / ${users[id].role})`;
+                select.appendChild(opt);
+            }
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const selectedId = document.getElementById('userSelect').value;
+            const password = document.getElementById('passwordInput').value;
+            const errorMsg = document.getElementById('errorMsg');
+
+            // 驗證密碼
+            if (users[selectedId] && password === users[selectedId].password) {
+                errorMsg.className = "hidden";
+                localStorage.setItem('currentUser', JSON.stringify(users[selectedId]));
+                window.location.href = 'main.html';
+            } else {
+                errorMsg.classList.remove('hidden');
+                errorMsg.classList.add('block');
+            }
+        });
+    </script>
+</body>
+</html>

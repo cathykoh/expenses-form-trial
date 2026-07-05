@@ -22,20 +22,17 @@
     </header>
 
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="flex items-center gap-4">
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex items-center gap-2">
                     <i class="fa-solid fa-shield-halved text-blue-500"></i>
                     <div><strong>權限：</strong> <span id="permissionInfoText"></span></div>
                 </div>
-                
                 <div id="tabContainer" class="hidden bg-slate-200 p-1 rounded-lg">
                     <button id="tabActive" onclick="switchTab('ACTIVE')" class="px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all">📂 活躍記錄 (未封存)</button>
                     <button id="tabAll" onclick="switchTab('ALL')" class="px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all">🗄️ 全部記錄 (含封存)</button>
                 </div>
             </div>
-            
             <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center gap-2 text-sm">
                 <i class="fa-solid fa-file-excel"></i> 匯出全新格式 Excel
             </button>
@@ -68,12 +65,8 @@
     </main>
 
     <script>
-        // 🌟 修正點 1: 防止未登入導致同步崩潰
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-        if (!currentUser) {
-            window.location.href = 'index.html';
-            throw new Error('未登入，中止執行並跳轉至登入頁面'); 
-        }
+        if (!currentUser) { window.location.href = 'index.html'; throw new Error('未登入'); }
 
         document.getElementById('userBadge').textContent = `${currentUser.name} (${currentUser.role})`;
 
@@ -85,65 +78,46 @@
         };
         document.getElementById('permissionInfoText').textContent = permissionDesc[currentUser.id] || '一般瀏覽及備註回覆。';
 
-        let allFetchedRecords = [];
-        let viewableRecords = [];
-        let currentFilterGroup = 'ALL'; 
-        let currentTab = 'ACTIVE';
+        let allFetchedRecords = []; let viewableRecords = [];
+        let currentFilterGroup = 'ALL'; let currentTab = 'ACTIVE';
 
-        // 🌟 修正點 2: 升級至 Version 4
         function initDB() {
             return new Promise((resolve, reject) => {
-                const req = indexedDB.open('SchoolExpenseDB', 4);
+                const req = indexedDB.open('SchoolExpenseDB', 4); // 🌟 版本 4 同步
                 req.onupgradeneeded = e => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains('expenses')) db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
-                    if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
                 };
                 req.onsuccess = e => resolve(e.target.result);
-                req.onerror = e => reject(e.target.error);
             });
         }
 
         function parseAmt(str) { return parseFloat(String(str).replace(/[^\d.-]/g, '')) || 0; }
 
         async function loadData() {
-            try {
-                const db = await initDB();
-                try {
-                    const tx = db.transaction('expenses', 'readonly');
-                    allFetchedRecords = await new Promise(r => { tx.objectStore('expenses').getAll().onsuccess = e => r(e.target.result); });
-                    allFetchedRecords.sort((a, b) => b.id - a.id);
-                } catch(e) {
-                    console.warn('資料表為空或未就緒', e);
-                    allFetchedRecords = [];
-                }
+            const db = await initDB();
+            const tx = db.transaction('expenses', 'readonly');
+            allFetchedRecords = await new Promise(r => { tx.objectStore('expenses').getAll().onsuccess = e => r(e.target.result); });
+            allFetchedRecords.sort((a, b) => b.id - a.id);
 
-                if (['accountant', 'user4', 'sysadmin'].includes(currentUser.id)) currentFilterGroup = 'ALL_SCHOOL';
-                else if (currentUser.id === 'user1') currentFilterGroup = 'TE科';
-                else currentFilterGroup = 'PERSONAL';
+            if (['accountant', 'user4', 'sysadmin'].includes(currentUser.id)) currentFilterGroup = 'ALL_SCHOOL';
+            else if (currentUser.id === 'user1') currentFilterGroup = 'TE科';
+            else currentFilterGroup = 'PERSONAL';
 
-                renderSummaryCards();
-                processPermissionsAndTabs();
-            } catch (err) {
-                console.error("載入失敗:", err);
-            }
+            renderSummaryCards(); processPermissionsAndTabs();
         }
 
         function switchTab(tab) {
             currentTab = tab;
-            document.getElementById('tabActive').className = tab === 'ACTIVE' ? "px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all" : "px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all";
-            document.getElementById('tabAll').className = tab === 'ALL' ? "px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all" : "px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all";
+            document.getElementById('tabActive').className = tab === 'ACTIVE' ? "px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm" : "px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700";
+            document.getElementById('tabAll').className = tab === 'ALL' ? "px-4 py-1.5 text-sm font-bold rounded-md bg-white text-blue-600 shadow-sm" : "px-4 py-1.5 text-sm font-bold rounded-md text-slate-500 hover:text-slate-700";
             processPermissionsAndTabs();
         }
 
         function processPermissionsAndTabs() {
             const isPersonalView = currentFilterGroup === 'PERSONAL';
-            if (isPersonalView) {
-                document.getElementById('tabContainer').classList.remove('hidden');
-            } else {
-                document.getElementById('tabContainer').classList.add('hidden');
-                currentTab = 'ACTIVE';
-            }
+            if (isPersonalView) document.getElementById('tabContainer').classList.remove('hidden');
+            else { document.getElementById('tabContainer').classList.add('hidden'); currentTab = 'ACTIVE'; }
 
             viewableRecords = allFetchedRecords.filter(r => {
                 if (isPersonalView) {
@@ -151,12 +125,10 @@
                     if (currentTab === 'ACTIVE' && r.archived) return false;
                     return true;
                 } else if (currentFilterGroup === 'ALL_SCHOOL') {
-                    if (r.archived) return false;
-                    return true;
+                    if (r.archived) return false; return true;
                 } else {
                     if (r.archived) return false;
-                    if (r.group !== currentFilterGroup) return false;
-                    return true;
+                    if (r.group !== currentFilterGroup) return false; return true;
                 }
             });
             renderTable(currentFilterGroup);
@@ -164,8 +136,7 @@
 
         function renderSummaryCards() {
             const cont = document.getElementById('summaryCardsContainer'); cont.innerHTML = '';
-            let sums = { PERSONAL: 0, ALL_SCHOOL: 0 };
-            let groupSums = {};
+            let sums = { PERSONAL: 0, ALL_SCHOOL: 0 }; let groupSums = {};
 
             allFetchedRecords.forEach(r => {
                 const v = parseAmt(r.amount);
@@ -201,7 +172,6 @@
             const tbody = document.getElementById('expenseTableBody'); tbody.innerHTML = '';
             let displayTitle = filter === 'ALL_SCHOOL' ? '全校所有記錄' : (filter === 'PERSONAL' ? '個人開支' : filter);
             if (filter === 'PERSONAL') displayTitle += (currentTab === 'ACTIVE' ? ' (未封存)' : ' (含封存)');
-            
             document.getElementById('tableTitle').textContent = `📋 範圍：${displayTitle}`;
             document.getElementById('tableTotalAmount').textContent = `小計: $${viewableRecords.reduce((s,r)=>s+parseAmt(r.amount),0).toLocaleString()} HKD`;
 
@@ -211,23 +181,18 @@
             viewableRecords.forEach((item, index) => {
                 const tr = document.createElement('tr');
                 let statusColor = item.archived ? 'bg-slate-200 text-slate-500' : (item.status==='已核准'?'bg-emerald-100 text-emerald-800':(item.status==='已拒絕'?'bg-rose-100 text-rose-800':'bg-amber-100 text-amber-800'));
-                
                 let statHTML = `<span class="px-2 py-1 rounded text-[10px] font-bold ${statusColor}">${item.archived ? '已封存' : item.status}</span>`;
                 if (currentUser.id === 'accountant' && !item.archived) {
-                    statHTML = `<select onchange="updateStat(${item.id}, this.value)" class="text-[10px] font-bold px-1 py-1 rounded border border-slate-300 bg-white text-blue-600"><option value="待審核" ${item.status==='待審核'?'selected':''}>待審核</option><option value="已核准" ${item.status==='已核准'?'selected':''}>已核准</option><option value="已拒絕" ${item.status==='已拒絕'?'selected':''}>已拒絕</option></select>`;
+                    statHTML = `<select onchange="updateStat(${item.id}, this.value)" class="text-[10px] font-bold px-1 py-1 rounded border border-slate-300 bg-white text-blue-600"><option value="待審核" ${item.status==='待審核'?'selected':''}>待審核</option><option value="已核准" ${item.status==='已核准'?'selected':''}>已核准</option><option value="自由" ${item.status==='已拒絕'?'selected':''}>已拒絕</option></select>`;
                 }
 
-                let actionHTML = `<div class="flex flex-col gap-1">`;
-                actionHTML += `<div class="flex gap-1">`;
-                
-                actionHTML += `<button onclick="handlePdfAction(${item.id}, 'view')" class="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded flex-1"><i class="fa-solid fa-up-right-from-square"></i> 開啟預覽</button>`;
-                
+                let actionHTML = `<div class="flex flex-col gap-1"><div class="flex gap-1">`;
+                actionHTML += `<button onclick="handlePdfAction(${item.id}, 'view')" class="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded flex-1"><i class="fa-solid fa-up-right-from-square"></i> 預覽</button>`;
                 if (!item.archived && (item.userId === currentUser.id || currentUser.id === 'accountant')) {
                     actionHTML += `<a href="expense_form.html?editId=${item.id}" class="text-[10px] bg-rose-600 text-white hover:bg-rose-700 px-2 py-1 rounded">✍️ 編輯</a>`;
                 }
                 actionHTML += `</div><div class="flex gap-1">`;
-                actionHTML += `<a href="expense_form.html?dupId=${item.id}" class="text-[10px] bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1 rounded flex-1 text-center" title="以此為範本建立新申請">📑 複製</a>`;
-                
+                actionHTML += `<a href="expense_form.html?dupId=${item.id}" class="text-[10px] bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1 rounded flex-1 text-center">📑 複製</a>`;
                 if (!item.archived && item.userId === currentUser.id) {
                     actionHTML += `<button onclick="archiveRecord(${item.id})" class="text-[10px] bg-slate-200 text-slate-600 hover:bg-slate-300 px-2 py-1 rounded">📦 封存</button>`;
                 }
@@ -240,21 +205,15 @@
                     <td class="p-3 font-black text-blue-700">$${parseAmt(item.amount).toLocaleString()}</td>
                     <td class="p-3 text-slate-700">${item.userName}<br><span class="text-[10px] text-slate-400">${item.group}</span></td>
                     <td class="p-3">${statHTML}</td>
-                    <td class="p-3">
-                        <div class="bg-amber-50 p-1.5 text-[10px] rounded border border-amber-100 mb-1 max-h-12 overflow-hidden text-slate-600">${item.remarks||'無'}</div>
-                        <button onclick="editRemark(${item.id})" class="text-[10px] text-blue-600 hover:underline">加備註</button>
-                    </td>
-                    <td class="p-3">
-                        <div class="text-[9px] text-slate-400 bg-slate-100 p-1 rounded font-mono truncate max-w-[120px] mb-1" title="${item.filePath}">${item.filePath}</div>
-                        ${actionHTML}
-                    </td>
+                    <td class="p-3"><div class="bg-amber-50 p-1.5 text-[10px] rounded border mb-1 max-h-12 overflow-hidden text-slate-600">${item.remarks||'無'}</div><button onclick="editRemark(${item.id})" class="text-[10px] text-blue-600">加備註</button></td>
+                    <td class="p-3">${actionHTML}</td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
         async function archiveRecord(id) {
-            if(!confirm('📦 確定要封存此記錄嗎？\n封存後不可復原，上級與會計員將無法再看到此項目！')) return;
+            if(!confirm('📦 確定要封存此記錄嗎？')) return;
             const db = await initDB(); const tx = db.transaction('expenses','readwrite');
             const store = tx.objectStore('expenses');
             store.get(id).onsuccess = e => { let r=e.target.result; r.archived = true; store.put(r).onsuccess=()=>loadData(); };
@@ -278,46 +237,26 @@
         async function handlePdfAction(id, action) {
             try {
                 const db = await initDB();
-                const tx = db.transaction(['expenses', 'settings'], 'readonly');
+                const tx = db.transaction(['expenses'], 'readonly');
                 const record = await new Promise(r => { tx.objectStore('expenses').get(parseInt(id)).onsuccess = (e) => r(e.target.result); });
-
                 let originalBytes = null;
                 try {
-                    const res = await fetch('template.pdf');
-                    if (res.ok) originalBytes = new Uint8Array(await res.arrayBuffer());
+                    const res = await fetch('template.pdf'); if (res.ok) originalBytes = new Uint8Array(await res.arrayBuffer());
                 } catch(e) {}
-
-                if (!originalBytes) {
-                    alert('伺服器找不到 template.pdf，請手動提供範本。');
-                    const input = document.createElement('input');
-                    input.type = 'file'; input.accept = '.pdf';
-                    input.onchange = async (e) => {
-                        if (e.target.files[0]) {
-                            originalBytes = new Uint8Array(await e.target.files[0].arrayBuffer());
-                            executePdfRebuildProcess(originalBytes, record, null, action);
-                        }
-                    };
-                    input.click();
-                } else {
-                    executePdfRebuildProcess(originalBytes, record, null, action);
-                }
+                executePdfRebuildProcess(originalBytes, record, action);
             } catch (err) { alert('操作失敗: ' + err.message); }
         }
 
-        async function executePdfRebuildProcess(originalBytes, record, fontCached, action) {
+        async function executePdfRebuildProcess(originalBytes, record, action) {
             try {
                 const newDoc = await PDFLib.PDFDocument.load(originalBytes);
                 if (typeof fontkit !== 'undefined') newDoc.registerFontkit(fontkit);
-
                 let embeddedFont = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
                 try {
-                    const fontRes = await fetch('font.ttf');
-                    if(fontRes.ok) embeddedFont = await newDoc.embedFont(new Uint8Array(await fontRes.arrayBuffer()));
+                    const fontRes = await fetch('font.ttf'); if(fontRes.ok) embeddedFont = await newDoc.embedFont(new Uint8Array(await fontRes.arrayBuffer()));
                 } catch(e) {}
 
-                const page = newDoc.getPages()[0];
-                const snapshotFields = JSON.parse(record.fieldsSnapshot);
-
+                const page = newDoc.getPages()[0]; const snapshotFields = JSON.parse(record.fieldsSnapshot);
                 snapshotFields.forEach(f => {
                     if (!f.content) return;
                     if (f.content === '✔') {
@@ -328,47 +267,27 @@
                         if (f.label === '申請者') page.drawText(f.content, { x: 130, y: 61, size: f.fontSize, font: embeddedFont, color: PDFLib.rgb(0, 0, 0) });
                     }
                 });
-
                 const finalPdfBytes = await newDoc.save();
                 const blobUrl = URL.createObjectURL(new Blob([finalPdfBytes], { type: 'application/pdf' }));
-                const fileName = record.filePath.split('/')[1] || 'Expense_Form.pdf';
+                const fileName = `Expense_${record.date}.pdf`;
 
                 if (action === 'view') {
                     const viewerWin = window.open('', '_blank');
-                    viewerWin.document.write(`
-                        <html>
-                        <head>
-                            <title>預覽憑證 - ${record.item}</title>
-                            <style>body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; background: #333; }</style>
-                        </head>
-                        <body>
-                            <div style="background: #f8fafc; padding: 12px 24px; border-bottom: 1px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                <div>
-                                    <h2 style="margin: 0; font-size: 16px; color: #1e293b;">📄 ${record.item}</h2>
-                                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">申請人: ${record.userName} | 狀態: ${record.status}</p>
-                                </div>
-                                <a href="${blobUrl}" download="${fileName}" style="background: #059669; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">⬇️ 下載實體 PDF</a>
-                            </div>
-                            <iframe src="${blobUrl}" style="flex: 1; border: none; width: 100%;"></iframe>
-                        </body>
-                        </html>
-                    `);
+                    viewerWin.document.write(`<html><head><title>預覽 - ${record.item}</title><style>body{margin:0;display:flex;flex-direction:column;height:100vh;background:#333;font-family:sans-serif;}</style></head><body><div style="background:#f8fafc;padding:12px 24px;border-bottom:1px solid #cbd5e1;display:flex;justify-content:between;align-items:center;box-shadow:0 2px 4px rgba(0,0,0,0.1); justify-content: space-between;"><div><h2 style="margin:0;font-size:16px;color:#1e293b;">📄 ${record.item}</h2><p style="margin:4px 0 0 0;font-size:12px;color:#64748b;">申請人: ${record.userName}</p></div><a href="${blobUrl}" download="${fileName}" style="background:#059669;color:white;padding:8px 16px;text-decoration:none;border-radius:6px;font-weight:bold;font-size:14px;">⬇️ 下載實體 PDF</a></div><iframe src="${blobUrl}" style="flex:1;border:none;width:100%;"></iframe></body></html>`);
                     viewerWin.document.close();
                 }
-            } catch (err) { alert('PDF 渲染失敗：' + err.message); }
+            } catch (err) { alert('PDF 失敗：' + err.message); }
         }
 
+        // 🌟 核心修正：完美解決個人開支、全校以及科組的 Excel 智慧導出過濾條件
         function exportToExcel() {
-            const exportData = viewableRecords.filter(r => !r.archived && (currentFilterGroup === 'ALL_SCHOOL' || r.group === currentFilterGroup));
-            if (exportData.length === 0) return alert('目前沒有未封存的數據可供匯出。');
+            const exportData = viewableRecords.filter(r => !r.archived && (currentFilterGroup === 'ALL_SCHOOL' || currentFilterGroup === 'PERSONAL' || r.group === currentFilterGroup));
+            if (exportData.length === 0) return alert('目前沒有可供匯出的數據。');
 
-            const wb = XLSX.utils.book_new();
-            const today = new Date().toISOString().split('T')[0];
+            const wb = XLSX.utils.book_new(); const today = new Date().toISOString().split('T')[0];
 
             if (currentFilterGroup === 'ALL_SCHOOL') {
-                const depts = {}; let sumAll = 0;
-                exportData.forEach(r => { if(!depts[r.group])depts[r.group]=[]; depts[r.group].push(r); sumAll+=parseAmt(r.amount); });
-
+                const depts = {}; let sumAll = 0; exportData.forEach(r => { if(!depts[r.group])depts[r.group]=[]; depts[r.group].push(r); sumAll+=parseAmt(r.amount); });
                 const sRow = [['全校所有科組', `匯出者: ${currentUser.name}`], [`下載版本日期: ${today}`, `總支出金額: $${sumAll}`], [], ['科組名稱', '項目數量', '小計金額 (HKD)']];
                 for(let d in depts) sRow.push([d, depts[d].length, depts[d].reduce((s,x)=>s+parseAmt(x.amount),0)]);
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sRow), "各科總覽");
@@ -380,10 +299,11 @@
                     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dRow), d);
                 }
             } else {
+                let sheetName = currentFilterGroup === 'PERSONAL' ? "個人開支明細" : currentFilterGroup;
                 const dSum = exportData.reduce((s,x)=>s+parseAmt(x.amount),0);
-                const dRow = [[currentFilterGroup, `匯出者: ${currentUser.name}`], [`下載版本日期: ${today}`, `總支出金額: $${dSum}`], [], ['#', 'ID', '日期', '類別', '物品', '用途', '金額(HKD)', '申請人', '狀態', '備註']];
+                const dRow = [[sheetName, `匯出者: ${currentUser.name}`], [`下載版本日期: ${today}`, `總支出金額: $${dSum}`], [], ['#', 'ID', '日期', '類別', '物品', '用途', '金額(HKD)', '申請人', '狀態', '備註']];
                 exportData.forEach((r, idx) => dRow.push([idx+1, r.id, r.date, r.category, r.item, r.purpose, parseAmt(r.amount), r.userName, r.status, (r.remarks||'').replace(/\n/g,' ')]));
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dRow), currentFilterGroup);
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dRow), sheetName.substring(0, 30));
             }
             XLSX.writeFile(wb, `SchoolExpense_${currentFilterGroup}_${today}.xlsx`);
         }
